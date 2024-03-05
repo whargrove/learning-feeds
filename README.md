@@ -17,5 +17,5 @@ CLIENT_ID=... CLIENT_SECRET=... python loader/loader.py
 Start the server:
 
 ```sh
-DB_PATH=learning.db uvicorn server.server:app
+DB_PATH=learning.db uvicorn server.server:app --log-config=server/log_conf.yml
 ```

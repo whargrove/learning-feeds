@@ -1,37 +1,25 @@
-import datetime
+import hashlib
 import logging
 import os
-import sys
-from datetime import timezone
+from datetime import datetime, timezone
+from typing import Annotated
 
 import aiosqlite
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Header, Response
 from feedgen.feed import FeedGenerator
 from feedgen.util import formatRFC2822
 
-# TODO integrate logging with FastAPI
-logger = logging.getLogger("server")
-logger.setLevel(logging.INFO)
-ch = logging.StreamHandler(sys.stdout)
-ch.setLevel(logging.INFO)
-ch.setFormatter(
-    logging.Formatter(fmt="%(asctime)s %(levelname)s %(name)s - %(message)s")
-)
-logging.Formatter.formatTime = (
-    lambda self, record, datefmt=None: datetime.datetime.fromtimestamp(
-        record.created, datetime.timezone.utc
-    )
-    .astimezone(datetime.timezone.utc)
-    .isoformat(sep="T", timespec="milliseconds")
-)
-logger.addHandler(ch)
+logger = logging.getLogger(__name__)
 
 
 app = FastAPI()
 
 
 @app.get("/courses")
-async def courses():
+async def courses(
+    if_none_match: Annotated[str | None, Header()] = None,
+    if_modified_since: Annotated[str | None, Header()] = None,
+):
     """The main feed, returns courses ordered by most recently published."""
     db_path = os.getenv("DB_PATH")
     if db_path is None:
@@ -40,12 +28,27 @@ async def courses():
     try:
         async with aiosqlite.connect(db_path) as db:
             db.row_factory = aiosqlite.Row
-            # TODO https://kevincox.ca/2022/05/06/rss-feed-best-practices/
-            #      - implement conditional request, max published_at_time to validate
-            #      - compute ETag using course.id
-            #      - set cache-control to 1hour
-            # TODO How many courses are published in a day? This should inform
-            #      the size of the feed.
+
+            headers = {"cache-control": "3600"}
+
+            # Check if "If-Modified-Since" precondition is requested and parse the
+            # header value as datetime. We'll use the datetime as a parameter to the
+            # database query to retrieve only items published since this precondition.
+            params = []
+            if if_modified_since is not None:
+                # Last-Modified is always "%a, %d %b %Y %H:%M:%S GMT"
+                # c.f. https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Last-Modified
+                last_modified_precondition = datetime.strptime(
+                    if_modified_since, "%a, %d %b %Y %H:%M:%S GMT"
+                )
+                logger.debug(
+                    "Precondition If-Modified-Since: %s",
+                    last_modified_precondition.isoformat(),
+                )
+                params.append(last_modified_precondition)
+            else:
+                params.append(datetime.fromtimestamp(0, tz=timezone.utc))
+
             async with db.execute(
                 """
                 SELECT  course.id,
@@ -58,17 +61,51 @@ async def courses():
                 FROM course
                 JOIN course_author ON course.id = course_author.course_id
                 JOIN author on course_author.author_id = author.id
+                WHERE course.published_at_time > ?
                 GROUP BY course.id
                 ORDER BY course.published_at_time DESC
                 LIMIT 50;
-                """
+                """,
+                parameters=[
+                    int(precondition.timestamp() * 1000) for precondition in params
+                ],
             ) as cursor:
                 fg = FeedGenerator()
                 fg.id("https://linkedin.com/learning")
                 fg.title("LinkedIn Learning - New Courses")
                 fg.link(href="https://linkedin.com/learning", rel="alternate")
-                # TODO link self
+                # TODO Add link self
+                if if_modified_since is not None and not cursor.rowcount:
+                    # If-Modified-Since precondition in request, and no rows returned
+                    # means we need to return a 304 Not Modified
+                    return Response(
+                        status_code=304,
+                        headers={**headers, "last-modified": if_modified_since},
+                    )
+
+                # Don't return a 404 Not Found when there are no rows in the cursor
+                # instead, return a feed with no items.
+
+                # Create a new hasher so that we can compute an etag for this resource.
+                # The etag will be used to perform weak validation to see if we need
+                # to return any data in this feed request.
+                etag_hasher = hashlib.md5()
+
+                last_modified_datetime = None
                 async for row in cursor:
+                    # use the course ID as input to the etag for this request
+                    etag_hasher.update(row["id"].encode())
+
+                    published_at = datetime.fromtimestamp(
+                        row["published_at_time"] / 1000, tz=timezone.utc
+                    )
+                    if not last_modified_datetime:
+                        # the results are ordered by published_at desc
+                        # so this is only true for the first item in the results
+                        # which is defacto the "most recently published" item
+                        # in this feed. We'll use this datetime as the last-modified
+                        last_modified_datetime = published_at
+
                     fe = fg.add_entry()
                     fe.id(row["id"])
                     fe.title(row["title"])
@@ -80,14 +117,38 @@ async def courses():
                         <p>{row["desc"]}</p>
                         """
                     fe.content(content=content, type="CDATA")
-                    published_timestamp = formatRFC2822(
-                        datetime.datetime.fromtimestamp(
-                            row["published_at_time"] / 1000, tz=timezone.utc
-                        )
+                    fe.published(formatRFC2822(published_at))
+
+                if last_modified_datetime:
+                    last_modified = last_modified_datetime.strftime(
+                        "%a, %d %b %Y %H:%M:%S GMT"
                     )
-                    fe.published(published_timestamp)
+                else:
+                    # if last_modified_datetime is None, then there were no results in the
+                    # cursor, so use "now" as the last-modified.
+                    last_modified = (
+                        datetime.now()
+                        .astimezone(tz=timezone.utc)
+                        .strftime("%a, %d %b %Y %H:%M:%S GMT")
+                    )
+
+                etag = etag_hasher.hexdigest()
+                if if_none_match == etag:
+                    return Response(
+                        status_code=304,
+                        headers={
+                            **headers,
+                            "etag": etag,
+                            "last-modified": last_modified,
+                        },
+                    )
+
                 atom_feed = fg.atom_str(pretty=True)
-                return Response(content=atom_feed, media_type="application/atom+xml")
+                return Response(
+                    content=atom_feed,
+                    media_type="application/atom+xml",
+                    headers={**headers, "etag": etag, "last-modified": last_modified},
+                )
     except Exception:
         logger.exception("Unexpected error while generating feed.")
         return Response(status_code=500)
