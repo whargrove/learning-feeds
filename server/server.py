@@ -30,8 +30,8 @@ logger.addHandler(ch)
 app = FastAPI()
 
 
-@app.get("/feed.xml")
-async def feed_xml():
+@app.get("/courses")
+async def courses():
     """The main feed, returns courses ordered by most recently published."""
     db_path = os.getenv("DB_PATH")
     if db_path is None:
