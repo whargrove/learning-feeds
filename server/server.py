@@ -7,7 +7,6 @@ from typing import Annotated
 import aiosqlite
 from fastapi import FastAPI, Header, Response
 from feedgen.feed import FeedGenerator
-from feedgen.util import formatRFC2822
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +105,7 @@ async def courses(
                         # in this feed. We'll use this datetime as the last-modified
                         last_modified_datetime = published_at
 
-                    fe = fg.add_entry()
+                    fe = fg.add_entry(order="append")
                     fe.id(row["id"])
                     fe.title(row["title"])
                     authors = [{"name": a} for a in row["author_names"].split(", ")]
@@ -116,8 +115,9 @@ async def courses(
                         <img src=\"{row["thumbnail"]}\" alt=\"{row["title"]}\"/>
                         <p>{row["desc"]}</p>
                         """
-                    fe.content(content=content, type="CDATA")
-                    fe.published(formatRFC2822(published_at))
+                    fe.summary(summary=content, type="html")
+                    fe.published(published=published_at)
+                    fe.updated(updated=published_at)
 
                 if last_modified_datetime:
                     last_modified = last_modified_datetime.strftime(
@@ -131,6 +131,8 @@ async def courses(
                         .astimezone(tz=timezone.utc)
                         .strftime("%a, %d %b %Y %H:%M:%S GMT")
                     )
+
+                fg.updated(last_modified)
 
                 etag = etag_hasher.hexdigest()
                 if if_none_match == etag:
