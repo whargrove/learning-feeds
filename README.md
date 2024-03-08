@@ -9,7 +9,7 @@ currently published (i.e. not retired) and related Author and Skills
 metadata for the Course.
 
 ```sh
-CLIENT_ID=... CLIENT_SECRET=... python loader/loader.py
+CLIENT_ID=... CLIENT_SECRET=... python learning-feeds/loader/loader.py
 ```
 
 ## Server
@@ -17,5 +17,5 @@ CLIENT_ID=... CLIENT_SECRET=... python loader/loader.py
 Start the server:
 
 ```sh
-DB_PATH=learning.db uvicorn server.server:app --log-config=server/log_conf.yml
+DB_PATH=learning.db uvicorn learning-feeds.server.server:app --log-config=learning-feeds/server/log_conf.yml
 ```
