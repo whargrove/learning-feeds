@@ -33,8 +33,8 @@ jobs:
         platforms: linux/amd64
         push: true
         tags: |
-          learning-feeds/server:latest
-          learning-feeds/server:${{ steps.timestamp.outputs.timestamp }}
+          learningfeeds.azurecr.io/learning-feeds/server:latest
+          learningfeeds.azurecr.io/learning-feeds/server:${{ steps.timestamp.outputs.timestamp }}
         secrets: |
           "LINKEDIN_CLIENT_ID=${{ secrets.LINKEDIN_CLIENT_ID }}"
           "LINKEDIN_CLIENT_SECRET=${{ secrets.LINKEDIN_CLIENT_SECRET }}"
