@@ -1,4 +1,4 @@
-name: CI/CD
+name: Build and Push
 
 on:
   schedule:
@@ -8,9 +8,11 @@ on:
       - main
 
 jobs:
-  build:
+  build-and-push:
     runs-on: ubuntu-latest
     steps:
+    - run: sudo chown runner:docker /var/run/docker.sock
+      if: ${{ env.ACT }}
     - name: Get current timestamp
       id: timestamp
       run: echo "::set-output name=timestamp::$(date +'%Y%m%d%H%M%S')"
