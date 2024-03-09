@@ -17,10 +17,10 @@ ENV VIRTUAL_ENV=/app/.venv \
     PATH="/app/.venv/bin:$PATH"
 COPY --from=base ${VIRTUAL_ENV} ${VIRTUAL_ENV}
 COPY learning-feeds/loader/loader.py ./
-RUN --mount=type=secret,id=linkedin_client_id \
-    --mount=type=secret,id=linkedin_client_secret \
-    export CLIENT_ID=$(cat /run/secrets/linkedin_client_id) && \
-    export CLIENT_SECRET=$(cat /run/secrets/linkedin_client_secret) && \
+RUN --mount=type=secret,id=LINKEDIN_CLIENT_ID \
+    --mount=type=secret,id=LINKEDIN_CLIENT_SECRET \
+    export CLIENT_ID=$(cat /run/secrets/LINKEDIN_CLIENT_ID) && \
+    export CLIENT_SECRET=$(cat /run/secrets/LINKEDIN_CLIENT_SECRET) && \
     python loader.py
 
 FROM python:3.12-slim as server
