@@ -14,25 +14,27 @@ jobs:
     - name: Get current timestamp
       id: timestamp
       run: echo "::set-output name=timestamp::$(date +'%Y%m%d%H%M%S')"
-    - name: Login to ACR
-      uses: docker/login-action@v3
-      with:
-        registry: learningfeeds.azurecr.io
-        username: ${{ secrets.AZURE_CLIENT_ID }}
-        password: ${{ secrets.AZURE_CLIENT_SECRET }}
     - name: Checkout
       uses: actions/checkout@v4
     - name: Setup QEMU
       uses: docker/setup-qemu-action@v3
     - name: Setup Build
       uses: docker/setup-buildx-action@v3
+    - name: Login to ACR
+      uses: docker/login-action@v3
+      with:
+        registry: learningfeeds.azurecr.io
+        username: ${{ secrets.AZURE_CLIENT_ID }}
+        password: ${{ secrets.AZURE_CLIENT_SECRET }}
     - name: Build
       uses: docker/build-push-action@v5
       with:
         context: .
         platforms: linux/amd64
         push: true
-        tags: learning-feeds/server:latest,learning-feeds/server:${{ steps.timestamp.outputs.timestamp }}
+        tags: |
+          learning-feeds/server:latest
+          learning-feeds/server:${{ steps.timestamp.outputs.timestamp }}
         secrets: |
           "LINKEDIN_CLIENT_ID=${{ secrets.LINKEDIN_CLIENT_ID }}"
           "LINKEDIN_CLIENT_SECRET=${{ secrets.LINKEDIN_CLIENT_SECRET }}"
