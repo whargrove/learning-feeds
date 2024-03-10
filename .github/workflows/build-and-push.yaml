@@ -11,9 +11,6 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
-    - name: Get current timestamp
-      id: timestamp
-      run: echo "::set-output name=timestamp::$(date +'%Y%m%d%H%M%S')"
     - name: Checkout
       uses: actions/checkout@v4
     - name: Setup QEMU
@@ -26,7 +23,7 @@ jobs:
         registry: learningfeeds.azurecr.io
         username: ${{ secrets.AZURE_CLIENT_ID }}
         password: ${{ secrets.AZURE_CLIENT_SECRET }}
-    - name: Build
+    - name: Build and Push
       uses: docker/build-push-action@v5
       with:
         context: .
@@ -34,7 +31,17 @@ jobs:
         push: true
         tags: |
           learningfeeds.azurecr.io/learning-feeds/server:latest
-          learningfeeds.azurecr.io/learning-feeds/server:${{ steps.timestamp.outputs.timestamp }}
         secrets: |
           "LINKEDIN_CLIENT_ID=${{ secrets.LINKEDIN_CLIENT_ID }}"
           "LINKEDIN_CLIENT_SECRET=${{ secrets.LINKEDIN_CLIENT_SECRET }}"
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    - name: Restart Container
+      uses: azure/cli@v2
+      with:
+        inlineScript: |
+          az container restart \
+            --name learning-feeds \
+            --resource-group learning-feeds
