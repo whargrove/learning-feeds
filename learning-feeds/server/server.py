@@ -70,10 +70,10 @@ async def courses(
                 ],
             ) as cursor:
                 fg = FeedGenerator()
-                fg.id("https://linkedin.com/learning")
+                fg.id("http://learning-feeds.bxfncnf2c0d8b6av.eastus.azurecontainer.io:8080/courses")
                 fg.title("LinkedIn Learning - New Courses")
                 fg.link(href="https://linkedin.com/learning", rel="alternate")
-                # TODO Add link self
+                fg.link(href="http://learning-feeds.bxfncnf2c0d8b6av.eastus.azurecontainer.io:8080/courses", rel="self")
                 if if_modified_since is not None and not cursor.rowcount:
                     # If-Modified-Since precondition in request, and no rows returned
                     # means we need to return a 304 Not Modified
