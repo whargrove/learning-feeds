@@ -6,6 +6,7 @@ from typing import Annotated
 
 import aiosqlite
 from fastapi import FastAPI, Header, Response
+from fastapi.params import Param
 from feedgen.feed import FeedGenerator
 
 logger = logging.getLogger(__name__)
@@ -14,10 +15,47 @@ logger = logging.getLogger(__name__)
 app = FastAPI()
 
 
+COURSES_SQL = """
+SELECT  course.id,
+        course.title,
+        course.desc,
+        course.url,
+        course.thumbnail,
+        course.published_at_time,
+        GROUP_CONCAT(author.name, ', ') AS author_names
+FROM course
+JOIN course_author ON course.id = course_author.course_id
+JOIN author on course_author.author_id = author.id
+WHERE course.published_at_time > ?
+GROUP BY course.id
+ORDER BY course.published_at_time DESC
+LIMIT 50;
+"""
+
+COURSES_BY_AUTHOR_SQL = """
+SELECT  course.id,
+        course.title,
+        course.desc,
+        course.url,
+        course.thumbnail,
+        course.published_at_time,
+        GROUP_CONCAT(author.name, ', ') AS author_names
+FROM course
+JOIN course_author ON course.id = course_author.course_id
+JOIN author on course_author.author_id = author.id
+WHERE author.slug = ?
+    AND course.published_at_time > ?
+GROUP BY course.id
+ORDER BY course.published_at_time DESC
+LIMIT 50;
+"""
+
+
 @app.get("/courses")
 async def courses(
     if_none_match: Annotated[str | None, Header()] = None,
     if_modified_since: Annotated[str | None, Header()] = None,
+    author: Annotated[str | None, Param()] = None,
 ):
     """The main feed, returns courses ordered by most recently published."""
     db_path = os.getenv("DB_PATH")
@@ -33,7 +71,7 @@ async def courses(
             # Check if "If-Modified-Since" precondition is requested and parse the
             # header value as datetime. We'll use the datetime as a parameter to the
             # database query to retrieve only items published since this precondition.
-            params = []
+            last_modified_precondition = None
             if if_modified_since is not None:
                 # Last-Modified is always "%a, %d %b %Y %H:%M:%S GMT"
                 # c.f. https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Last-Modified
@@ -44,31 +82,21 @@ async def courses(
                     "Precondition If-Modified-Since: %s",
                     last_modified_precondition.isoformat(),
                 )
-                params.append(last_modified_precondition)
-            else:
-                params.append(datetime.fromtimestamp(0, tz=timezone.utc))
 
-            async with db.execute(
-                """
-                SELECT  course.id,
-                        course.title,
-                        course.desc,
-                        course.url,
-                        course.thumbnail,
-                        course.published_at_time,
-                        GROUP_CONCAT(author.name, ', ') AS author_names
-                FROM course
-                JOIN course_author ON course.id = course_author.course_id
-                JOIN author on course_author.author_id = author.id
-                WHERE course.published_at_time > ?
-                GROUP BY course.id
-                ORDER BY course.published_at_time DESC
-                LIMIT 100;
-                """,
-                parameters=[
-                    int(precondition.timestamp() * 1000) for precondition in params
-                ],
-            ) as cursor:
+            if author is not None:
+                sql_expr = COURSES_BY_AUTHOR_SQL
+            else:
+                sql_expr = COURSES_SQL
+
+            sql_parameters = [
+                author if author else None,
+                last_modified_precondition.timestamp() * 1000
+                if last_modified_precondition
+                else 0,
+            ]
+            sql_parameters = [p for p in sql_parameters if p is not None]
+
+            async with db.execute(sql_expr, parameters=sql_parameters) as cursor:
                 fg = FeedGenerator()
                 fg.id(
                     "http://learning-feeds.bxfncnf2c0d8b6av.eastus.azurecontainer.io:8080/courses"
