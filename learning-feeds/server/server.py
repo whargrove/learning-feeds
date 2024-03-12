@@ -63,17 +63,22 @@ async def courses(
                 WHERE course.published_at_time > ?
                 GROUP BY course.id
                 ORDER BY course.published_at_time DESC
-                LIMIT 50;
+                LIMIT 100;
                 """,
                 parameters=[
                     int(precondition.timestamp() * 1000) for precondition in params
                 ],
             ) as cursor:
                 fg = FeedGenerator()
-                fg.id("http://learning-feeds.bxfncnf2c0d8b6av.eastus.azurecontainer.io:8080/courses")
+                fg.id(
+                    "http://learning-feeds.bxfncnf2c0d8b6av.eastus.azurecontainer.io:8080/courses"
+                )
                 fg.title("LinkedIn Learning - New Courses")
                 fg.link(href="https://linkedin.com/learning", rel="alternate")
-                fg.link(href="http://learning-feeds.bxfncnf2c0d8b6av.eastus.azurecontainer.io:8080/courses", rel="self")
+                fg.link(
+                    href="http://learning-feeds.bxfncnf2c0d8b6av.eastus.azurecontainer.io:8080/courses",
+                    rel="self",
+                )
                 if if_modified_since is not None and not cursor.rowcount:
                     # If-Modified-Since precondition in request, and no rows returned
                     # means we need to return a 304 Not Modified
@@ -91,7 +96,9 @@ async def courses(
                 etag_hasher = hashlib.md5()
 
                 last_modified_datetime = None
+                count = 0
                 async for row in cursor:
+                    count += 1
                     # use the course ID as input to the etag for this request
                     etag_hasher.update(row["id"].encode())
 
@@ -145,6 +152,7 @@ async def courses(
                         },
                     )
 
+                logger.info("Generated feed with %d items.", count)
                 atom_feed = fg.atom_str(pretty=True)
                 return Response(
                     content=atom_feed,
