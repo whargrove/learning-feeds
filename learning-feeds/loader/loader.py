@@ -130,8 +130,12 @@ def _get_and_persist_courses(access_token: str, conn: sqlite3.Connection) -> int
                 course_skills = [
                     (
                         classification["associatedClassification"]["urn"],  # id
-                        classification["associatedClassification"]["name"]["value"],  # name
-                        slugify(classification["associatedClassification"]["name"]["value"]),  # slug
+                        classification["associatedClassification"]["name"][
+                            "value"
+                        ],  # name
+                        slugify(
+                            classification["associatedClassification"]["name"]["value"]
+                        ),  # slug
                     )
                     for classification in data["details"]["classifications"]
                     if classification["associatedClassification"]["type"] == "SKILL"
@@ -143,23 +147,33 @@ def _get_and_persist_courses(access_token: str, conn: sqlite3.Connection) -> int
             conn.executemany(
                 """
                 INSERT OR IGNORE INTO course VALUES(?, ?, ?, ?, ?, ?, ?)
-                """, courses)
+                """,
+                courses,
+            )
             conn.executemany(
                 """
                 INSERT OR IGNORE INTO author VALUES(?, ?, ?)
-                """, authors)
+                """,
+                authors,
+            )
             conn.executemany(
                 """
                 INSERT INTO course_author VALUES(?, ?)
-                """, course_author_rels)
+                """,
+                course_author_rels,
+            )
             conn.executemany(
                 """
                 INSERT OR IGNORE INTO skill VALUES(?, ?, ?)
-                """, skills)
+                """,
+                skills,
+            )
             conn.executemany(
                 """
                 INSERT INTO course_skill VALUES(?, ?)
-                """, course_skill_rels)
+                """,
+                course_skill_rels,
+            )
             conn.commit()
 
             if len(response_json["elements"]) < 100:
@@ -172,9 +186,16 @@ def _get_and_persist_courses(access_token: str, conn: sqlite3.Connection) -> int
                 if link["rel"] == "next"
             ]
             if not next:
-                logger.warn("")
+                logger.warn(
+                    'paging.links does not contain "next" but it was expected. '
+                    + "This may not be the last page! Or the total number of courses % 100 == 0."
+                )
                 break
-            url = f"https://api.linkedin.com{next[0]["href"]}"
+
+            # The LinkedIn REST API started returning invalid links in the "next" field
+            # to work aroud this we replace the "/rest" with "/v2" for the next page.
+            # see https://github.com/whargrove/learning-feeds/issues/10
+            url = f"https://api.linkedin.com{next[0]['href'].replace('/rest', '/v2')}"
     except Exception:
         logger.exception("Error while getting course data.")
         return 1
