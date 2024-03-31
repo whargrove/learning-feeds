@@ -2,6 +2,14 @@
 
 RSS feed for content published on LinkedIn Learning.
 
+## Subscribing
+
+This feed is available at <http://learning-feeds.bxfncnf2c0d8b6av.eastus.azurecontainer.io:8080/courses>.
+
+By default, it returns entries of all english language courses.
+
+You can filter the feed by `author`, e.g. `?author=scott-simpson`, only courses by [Scott Simpson](https://www.linkedin.com/in/scotts82/) will be returned in the feed.
+
 ## Docker
 
 This will build a docker image that is ready to run the server.
