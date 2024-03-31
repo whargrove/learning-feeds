@@ -107,13 +107,6 @@ async def courses(
                     href="http://learning-feeds.bxfncnf2c0d8b6av.eastus.azurecontainer.io:8080/courses",
                     rel="self",
                 )
-                if if_modified_since is not None and not cursor.rowcount:
-                    # If-Modified-Since precondition in request, and no rows returned
-                    # means we need to return a 304 Not Modified
-                    return Response(
-                        status_code=304,
-                        headers={**headers, "last-modified": if_modified_since},
-                    )
 
                 # Don't return a 404 Not Found when there are no rows in the cursor
                 # instead, return a feed with no items.
@@ -153,6 +146,14 @@ async def courses(
                     fe.summary(summary=content, type="html")
                     fe.published(published=published_at)
                     fe.updated(updated=published_at)
+
+                if if_modified_since is not None and count == 0:
+                    # If-Modified-Since precondition in request, and no rows returned
+                    # means we need to return a 304 Not Modified.
+                    return Response(
+                        status_code=304,
+                        headers={**headers, "last-modified": if_modified_since},
+                    )
 
                 if last_modified_datetime:
                     last_modified = last_modified_datetime.strftime(
