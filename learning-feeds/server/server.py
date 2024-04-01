@@ -56,7 +56,7 @@ async def courses(
     if_none_match: Annotated[str | None, Header()] = None,
     if_modified_since: Annotated[str | None, Header()] = None,
     author: Annotated[str | None, Param()] = None,
-):
+) -> Response:
     """The main feed, returns courses ordered by most recently published."""
     db_path = os.getenv("DB_PATH")
     if db_path is None:
@@ -208,5 +208,5 @@ async def courses(
 
 
 @app.get("/ruok")
-async def ruok():
+async def ruok() -> str:
     return "imok"
