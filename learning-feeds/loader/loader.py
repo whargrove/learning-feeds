@@ -84,7 +84,9 @@ def load() -> int:
         return _get_and_persist_courses(access_token=access_token, conn=conn)
 
 
-def _get_and_persist_courses(access_token: str, conn: sqlite3.Connection) -> int:
+def _get_and_persist_courses(
+    access_token: str, conn: sqlite3.Connection
+) -> int:
     url = None
     headers = {"Authorization": f"Bearer {access_token}"}
     try:
@@ -111,7 +113,9 @@ def _get_and_persist_courses(access_token: str, conn: sqlite3.Connection) -> int
                     # to the URL to de-identify users.
                     data["details"]["urls"]["webLaunch"].split("?")[0],  # url
                     data["details"]["images"]["primary"],  # thumbnail
-                    data["details"]["availableLocales"][0]["language"],  # language
+                    data["details"]["availableLocales"][0][
+                        "language"
+                    ],  # language
                     data["details"]["publishedAt"],  # published_at_time
                 )
                 courses.append(course)
@@ -129,16 +133,21 @@ def _get_and_persist_courses(access_token: str, conn: sqlite3.Connection) -> int
                     course_author_rels.append((course[0], a[0]))
                 course_skills = [
                     (
-                        classification["associatedClassification"]["urn"],  # id
+                        classification["associatedClassification"][
+                            "urn"
+                        ],  # id
                         classification["associatedClassification"]["name"][
                             "value"
                         ],  # name
                         slugify(
-                            classification["associatedClassification"]["name"]["value"]
+                            classification["associatedClassification"]["name"][
+                                "value"
+                            ]
                         ),  # slug
                     )
                     for classification in data["details"]["classifications"]
-                    if classification["associatedClassification"]["type"] == "SKILL"
+                    if classification["associatedClassification"]["type"]
+                    == "SKILL"
                 ]
                 for s in course_skills:
                     skills.append(s)
@@ -216,12 +225,27 @@ def _get_url() -> str:
         "sourceLocale.country": "US",
         "expandDepth": 1,
         "includeRetired": "false",
-        "fields": "urn,title:(value),details:(availableLocales,description,classifications,contributors,images,publishedAt,urls:(webLaunch))",
+        "fields": """
+            urn,
+            title:(value),
+            details:(
+                availableLocales,
+                description,
+                classifications,
+                contributors,
+                images,
+                publishedAt,
+                urls:(
+                    webLaunch)
+                )
+            """,
         "start": 0,
         # LinkedIn Learning API will return a 403 Forbidden error if more than 100 count is used
         "count": 100,
     }
-    return f"https://api.linkedin.com/v2/learningAssets?{urlencode(query_params)}"
+    return (
+        f"https://api.linkedin.com/v2/learningAssets?{urlencode(query_params)}"
+    )
 
 
 def _get_api_access_token() -> str | None:
@@ -240,7 +264,8 @@ def _get_api_access_token() -> str | None:
         return response.json()["access_token"]
     except Exception:
         logger.exception(
-            "Unexpected error while requesting credentials: %s", response.json()
+            "Unexpected error while requesting credentials: %s",
+            response.json(),
         )
         return None
 
