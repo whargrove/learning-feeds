@@ -14,7 +14,7 @@ ch.setLevel(logging.INFO)
 ch.setFormatter(
     logging.Formatter(fmt="%(asctime)s %(levelname)s %(name)s - %(message)s")
 )
-logging.Formatter.formatTime = (
+logging.Formatter.formatTime = (  # type: ignore[method-assign]
     lambda self, record, datefmt=None: datetime.datetime.fromtimestamp(
         record.created, datetime.timezone.utc
     )
