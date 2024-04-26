@@ -56,7 +56,7 @@ async def courses(
     if_none_match: Annotated[str | None, Header()] = None,
     if_modified_since: Annotated[str | None, Header()] = None,
     author: Annotated[str | None, Param()] = None,
-):
+) -> Response:
     """The main feed, returns courses ordered by most recently published."""
     db_path = os.getenv("DB_PATH")
     if db_path is None:
@@ -68,9 +68,10 @@ async def courses(
 
             headers = {"cache-control": "3600"}
 
-            # Check if "If-Modified-Since" precondition is requested and parse the
-            # header value as datetime. We'll use the datetime as a parameter to the
-            # database query to retrieve only items published since this precondition.
+            # Check if "If-Modified-Since" precondition is requested and parse
+            # the header value as datetime. We'll use the datetime as a
+            # parameter to the database query to retrieve only items published
+            # since this precondition.
             last_modified_precondition = None
             if if_modified_since is not None:
                 # Last-Modified is always "%a, %d %b %Y %H:%M:%S GMT"
@@ -90,9 +91,11 @@ async def courses(
 
             sql_parameters = [
                 author if author else None,
-                last_modified_precondition.timestamp() * 1000
-                if last_modified_precondition
-                else 0,
+                (
+                    last_modified_precondition.timestamp() * 1000
+                    if last_modified_precondition
+                    else 0
+                ),
             ]
             sql_parameters = [p for p in sql_parameters if p is not None]
 
@@ -152,7 +155,10 @@ async def courses(
                     # means we need to return a 304 Not Modified.
                     return Response(
                         status_code=304,
-                        headers={**headers, "last-modified": if_modified_since},
+                        headers={
+                            **headers,
+                            "last-modified": if_modified_since,
+                        },
                     )
 
                 if last_modified_datetime:
@@ -186,7 +192,11 @@ async def courses(
                 return Response(
                     content=atom_feed,
                     media_type="application/atom+xml",
-                    headers={**headers, "etag": etag, "last-modified": last_modified},
+                    headers={
+                        **headers,
+                        "etag": etag,
+                        "last-modified": last_modified,
+                    },
                 )
     except Exception:
         logger.exception("Unexpected error while generating feed.")
@@ -194,5 +204,5 @@ async def courses(
 
 
 @app.get("/ruok")
-async def ruok():
+async def ruok() -> str:
     return "imok"

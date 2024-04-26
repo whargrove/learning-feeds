@@ -14,7 +14,7 @@ ch.setLevel(logging.INFO)
 ch.setFormatter(
     logging.Formatter(fmt="%(asctime)s %(levelname)s %(name)s - %(message)s")
 )
-logging.Formatter.formatTime = (
+logging.Formatter.formatTime = (  # type: ignore[method-assign]
     lambda self, record, datefmt=None: datetime.datetime.fromtimestamp(
         record.created, datetime.timezone.utc
     )
@@ -216,7 +216,20 @@ def _get_url() -> str:
         "sourceLocale.country": "US",
         "expandDepth": 1,
         "includeRetired": "false",
-        "fields": "urn,title:(value),details:(availableLocales,description,classifications,contributors,images,publishedAt,urls:(webLaunch))",
+        "fields": """
+            urn,
+            title:(value),
+            details:(
+                availableLocales,
+                description,
+                classifications,
+                contributors,
+                images,
+                publishedAt,
+                urls:(
+                    webLaunch)
+                )
+            """,
         "start": 0,
         # LinkedIn Learning API will return a 403 Forbidden error if more than 100 count is used
         "count": 100,
@@ -240,7 +253,8 @@ def _get_api_access_token() -> str | None:
         return response.json()["access_token"]
     except Exception:
         logger.exception(
-            "Unexpected error while requesting credentials: %s", response.json()
+            "Unexpected error while requesting credentials: %s",
+            response.json(),
         )
         return None
 
