@@ -99,9 +99,7 @@ async def courses(
             ]
             sql_parameters = [p for p in sql_parameters if p is not None]
 
-            async with db.execute(
-                sql_expr, parameters=sql_parameters
-            ) as cursor:
+            async with db.execute(sql_expr, parameters=sql_parameters) as cursor:
                 fg = FeedGenerator()
                 fg.id(
                     "http://learning-feeds.bxfncnf2c0d8b6av.eastus.azurecontainer.io:8080/courses"
@@ -141,9 +139,7 @@ async def courses(
                     fe = fg.add_entry(order="append")
                     fe.id(row["id"])
                     fe.title(row["title"])
-                    authors = [
-                        {"name": a} for a in row["author_names"].split(", ")
-                    ]
+                    authors = [{"name": a} for a in row["author_names"].split(", ")]
                     fe.author(authors)
                     fe.link(href=row["url"])
                     content = f"""
