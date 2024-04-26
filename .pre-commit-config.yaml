@@ -21,3 +21,8 @@ repos:
     rev: v1.9.0
     hooks:
       - id: mypy
+        args: [--config-file=setup.cfg]
+        additional_dependencies: [
+          "types-requests==2.31.0.20240406",
+          "types-python-slugify==8.0.2.20240310"
+        ]
