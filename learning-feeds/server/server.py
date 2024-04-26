@@ -50,18 +50,45 @@ ORDER BY course.published_at_time DESC
 LIMIT 50;
 """
 
+COURSES_BY_SKILL_SQL = """
+SELECT  course.id,
+        course.title,
+        course.desc,
+        course.url,
+        course.thumbnail,
+        course.published_at_time,
+        GROUP_CONCAT(author.name, ', ') AS author_names
+FROM course
+JOIN course_author ON course.id = course_author.course_id
+JOIN author on course_author.author_id = author.id
+JOIN course_skill ON course.id = course_skill.course_id
+JOIN skill ON course_skill.skill_id = skill.id
+WHERE course.published_at_time > ?
+  AND skill.slug = ?
+GROUP BY course.id
+ORDER BY course.published_at_time DESC
+LIMIT 50;
+"""
+
 
 @app.get("/courses")
 async def courses(
     if_none_match: Annotated[str | None, Header()] = None,
     if_modified_since: Annotated[str | None, Header()] = None,
     author: Annotated[str | None, Param()] = None,
+    skill: Annotated[str | None, Param()] = None,
 ) -> Response:
     """The main feed, returns courses ordered by most recently published."""
     db_path = os.getenv("DB_PATH")
     if db_path is None:
         logger.error("DB_PATH environment variable is not set.")
         return Response(status_code=500)
+
+    if author and skill:
+        # TODO: Refactor to allow filtering by both author
+        #       and skill.
+        return Response(status_code=400)
+
     try:
         async with aiosqlite.connect(db_path) as db:
             db.row_factory = aiosqlite.Row
@@ -86,11 +113,16 @@ async def courses(
 
             if author is not None:
                 sql_expr = COURSES_BY_AUTHOR_SQL
+            elif skill is not None:
+                sql_expr = COURSES_BY_SKILL_SQL
             else:
                 sql_expr = COURSES_SQL
 
             sql_parameters = [
+                # TODO: Refactor to allow filtering by both author
+                #       and skill.
                 author if author else None,
+                skill if skill else None,
                 (
                     last_modified_precondition.timestamp() * 1000
                     if last_modified_precondition
